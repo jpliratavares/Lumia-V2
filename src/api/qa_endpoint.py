@@ -40,13 +40,15 @@ async def ask_question(question: Question):
         query_embedding = get_embedding(question.text)
         
         # Search for relevant documents with lower threshold and more results
-        relevant_docs = vector_store.search(query_embedding, k=5)  # Aumentado de 3 para 5
+        relevant_docs = vector_store.search(query_embedding, k=1)  # Aumentado de 3 para 5
         
         # Extract scores
         scores = [doc.get('score', 0.0) for doc in relevant_docs]
         
-        # Create context from relevant documents
-        context = "\n\n".join([doc["content"] for doc in relevant_docs])
+        # Adiciona o source (URL) ao final de cada trecho de contexto
+        context = "\n\n".join([
+            f"Fonte: {doc['url']}\n{doc['content']}" for doc in relevant_docs
+        ])
         
         # Create prompt for Groq
         prompt = f"""Com base no contexto fornecido sobre a UFPB, responda a pergunta em português.
@@ -74,6 +76,11 @@ Resposta:"""
         
         # Extract answer from response
         answer = response.choices[0].message.content
+        
+        # Adiciona as URLs das fontes ao final da resposta textual
+        if relevant_docs:
+            fontes = "\n".join([f"Fonte: {doc['url']}" for doc in relevant_docs])
+            answer = f"{answer}\n\n{fontes}"
         
         return Answer(
             answer=answer,

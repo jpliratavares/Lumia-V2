@@ -3,6 +3,24 @@ from bs4 import BeautifulSoup
 from typing import List, Dict
 from urllib.parse import urljoin
 import time
+from sentence_transformers import SentenceTransformer
+import numpy as np
+import json
+import os
+
+DATA_DIR = "data"
+DOCUMENTS_PATH = os.path.join(DATA_DIR, "documents.json")
+EMBEDDINGS_PATH = os.path.join(DATA_DIR, "embeddings.npy")
+model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+
+IGNORE_EXTENSIONS = [
+    ".pdf", ".jpg", ".jpeg", ".png", ".css", ".js", ".doc", ".docx", ".xls", ".xlsx",
+    ".ppt", ".pptx", ".zip", ".rar", ".mp3", ".mp4", ".avi", ".mov", ".svg", ".xml", ".ico"
+]
+
+def has_ignored_extension(url):
+    url_lower = url.lower()
+    return any(url_lower.endswith(ext) for ext in IGNORE_EXTENSIONS)
 
 class UFPBScraper:
     def __init__(self):
@@ -77,56 +95,54 @@ class UFPBScraper:
             print(f"  ❌ Erro ao extrair conteúdo: {str(e)}")
             return ""
 
-    def scrape_all(self) -> List[Dict[str, str]]:
-        """Scrape the main page and its direct links"""
-        print("\n🔍 Iniciando coleta de dados da UFPB...")
-        documents = []
-        processed_urls = set()  # Para evitar URLs duplicadas
+    def scrape_all(self, max_pages: int = 1000, save_callback=None) -> List[Dict[str, str]]:
+        """Crawl recursivamente todas as páginas do domínio base da UFPB, salvando e limpando cache após cada página."""
+        print("\n🔍 Iniciando coleta recursiva de dados da UFPB...")
+        processed_urls = set()
+        to_visit = [self.base_url]
+        page_count = 0
         
-        print("\n📄 Coletando página principal...")
-        main_content = self._get_page_content(self.base_url)
-        if main_content:
-            main_soup = BeautifulSoup(main_content, 'html.parser')
-            
-            # Add main page content
-            print("\nExtraindo conteúdo da página principal...")
-            main_text = self._extract_text_content(main_soup)
-            if main_text:
-                documents.append({
-                    'url': self.base_url,
-                    'content': main_text
-                })
-                processed_urls.add(self.base_url)
-                print("  ✅ Página principal processada")
-            
-            # Get direct links
-            direct_links = self._extract_direct_links(main_soup, self.base_url)
-            
-            if direct_links:
-                print(f"\n📑 Processando {len(direct_links)} páginas encontradas...")
-                # Scrape each direct link
-                for i, link in enumerate(direct_links, 1):
-                    print(f"\n[{i}/{len(direct_links)}] Processando página...")
-                    if link not in processed_urls:
-                        content = self._get_page_content(link)
-                        if content:
-                            soup = BeautifulSoup(content, 'html.parser')
-                            text = self._extract_text_content(soup)
-                            if text:
-                                documents.append({
-                                    'url': link,
-                                    'content': text
-                                })
-                                print("  ✅ Página processada com sucesso")
-                        processed_urls.add(link)
-                        if i < len(direct_links):
-                            print("  ⏳ Aguardando 0.5 segundos antes da próxima página...")
-                            time.sleep(0.5)
-            else:
-                print("\n⚠️ Nenhum link adicional encontrado")
-        
-        print(f"\n✨ Coleta finalizada!")
+        while to_visit and page_count < max_pages:
+            url = to_visit.pop(0)
+            if url in processed_urls:
+                continue
+            # IGNORA arquivos binários
+            if has_ignored_extension(url):
+                print(f"  ⚠️ Ignorando arquivo binário: {url}")
+                processed_urls.add(url)
+                continue
+            print(f"\n[{page_count+1}] Visitando: {url}")
+            content = self._get_page_content(url)
+            if not content:
+                processed_urls.add(url)
+                continue
+            try:
+                soup = BeautifulSoup(content, 'html.parser')
+            except Exception as e:
+                print(f"  ❌ Erro ao processar conteúdo da página (provavelmente não HTML): {e}")
+                processed_urls.add(url)
+                continue
+            text = self._extract_text_content(soup)
+            if text:
+                doc = {'url': url, 'content': text}
+                if save_callback:
+                    save_callback(doc)
+            processed_urls.add(url)
+            page_count += 1
+            links = self._extract_direct_links(soup, url)
+            for link in links:
+                if link not in processed_urls and link not in to_visit:
+                    to_visit.append(link)
+            if to_visit:
+                print("  ⏳ Aguardando 0.5 segundos antes da próxima página...")
+                time.sleep(0.5)
+            # Limpa variáveis pesadas para liberar RAM
+            del soup, content, text
+        print(f"\n✨ Coleta recursiva finalizada!")
         print(f"📊 Estatísticas:")
         print(f"   - Total de páginas processadas: {len(processed_urls)}")
-        print(f"   - Total de documentos coletados: {len(documents)}")
-        return documents
+        return []
+
+if __name__ == "__main__":
+    scraper = UFPBScraper()
+    scraper.scrape_all()

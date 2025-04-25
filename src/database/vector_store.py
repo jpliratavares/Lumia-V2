@@ -73,7 +73,7 @@ class VectorStore:
         os.makedirs(directory, exist_ok=True)
         
         # Save documents
-        with open(os.path.join(directory, "documents.json"), "w") as f:
+        with open(os.path.join(directory, "documents.json"), "w", encoding="utf-8") as f:
             json.dump(self.documents, f)
             
         # Save embeddings if they exist
@@ -83,7 +83,7 @@ class VectorStore:
     def load(self, directory: str):
         """Load the documents and embeddings from disk"""
         # Load documents
-        with open(os.path.join(directory, "documents.json"), "r") as f:
+        with open(os.path.join(directory, "documents.json"), "r", encoding="utf-8") as f:
             self.documents = json.load(f)
             
         # Load embeddings if they exist

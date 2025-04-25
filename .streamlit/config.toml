@@ -1,0 +1,7 @@
+[theme]
+base="dark"
+primaryColor="#7a5ef8"                   # Cor principal (botões, destaques)
+backgroundColor="#121212"                # Fundo principal
+secondaryBackgroundColor="#1e1e1e"       # Sidebar e caixas internas
+textColor="#FFFFFF"                      # Texto principal
+font="sans serif"
