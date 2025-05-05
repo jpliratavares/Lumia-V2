@@ -1,1 +1,33 @@
+# Ignore arquivos de ambiente e credenciais
 .env
+.env.*
+
+# Ignore arquivos de log e checkpoints
+scraper_log.txt
+website_logs.json
+checkpoint.json
+
+# Ignore arquivos de cache e bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore bancos de dados e arquivos de dados locais
+data/*.db
+data/*.npy
+data/*.json
+scraped_data/*.npy
+scraped_data/*.json
+
+# Ignore arquivos temporários
+*.tmp
+*.temp
+~$*
+
+# Ignore pastas do sistema
+.DS_Store
+Thumbs.db
+
+# Ignore arquivos de configuração do VSCode
+.vscode/
