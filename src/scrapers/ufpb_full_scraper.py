@@ -6,6 +6,8 @@ import json
 import os
 import numpy as np
 from sentence_transformers import SentenceTransformer
+import tempfile
+from pdfminer.high_level import extract_text as extract_pdf_text
 
 class UFPBFullScraper:
     def __init__(self, base_url, data_dir):
@@ -21,7 +23,7 @@ class UFPBFullScraper:
 
     def is_valid_url(self, url):
         parsed = urlparse(url)
-        return parsed.scheme in ("http", "https") and parsed.netloc == self.domain
+        return parsed.scheme in ("http", "https") and parsed.netloc.endswith(self.domain)
 
     def extract_text(self, soup):
         for tag in soup(['script', 'style', 'nav', 'footer', 'header', 'noscript', 'svg', 'form', 'aside']):
@@ -55,14 +57,13 @@ class UFPBFullScraper:
         failed_urls = set()
         while True:
             if not self.to_visit:
-                # Se não há mais URLs para visitar, mas há falhas, tente novamente as falhas
                 if failed_urls:
                     print(f"Re-tentando {len(failed_urls)} URLs que falharam anteriormente...")
                     self.to_visit = failed_urls.copy()
                     failed_urls.clear()
-                    time.sleep(1)  # Espera antes de tentar de novo
+                    time.sleep(1)
                 else:
-                    break  # Não há mais nada para tentar
+                    break
             url = self.to_visit.pop()
             if url in self.visited:
                 continue
@@ -70,19 +71,35 @@ class UFPBFullScraper:
             success = False
             while retries < max_retries:
                 try:
-                    resp = requests.get(url, timeout=15)
-                    if resp.status_code != 200 or 'text/html' not in resp.headers.get('Content-Type', ''):
+                    resp = requests.get(url, timeout=20, stream=True)
+                    content_type = resp.headers.get('Content-Type', '')
+                    # Se for PDF, baixa e converte
+                    if 'application/pdf' in content_type or url.lower().endswith('.pdf'):
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+                            for chunk in resp.iter_content(1024):
+                                tmp_pdf.write(chunk)
+                            tmp_pdf_path = tmp_pdf.name
+                        try:
+                            text = extract_pdf_text(tmp_pdf_path)
+                            if text and len(text.strip()) > 0:
+                                self.save_doc_and_embedding(url, text)
+                        except Exception as e:
+                            print(f"Falha ao extrair texto de PDF {url}: {e}")
+                        finally:
+                            os.remove(tmp_pdf_path)
+                        success = True
                         break
-                    soup = BeautifulSoup(resp.text, 'html.parser')
-                    texts = self.extract_text(soup)
-                    for text in texts:
-                        self.save_doc_and_embedding(url, text)
-                    for link in soup.find_all('a', href=True):
-                        next_url = urljoin(url, link['href'])
-                        if self.is_valid_url(next_url) and next_url not in self.visited:
-                            self.to_visit.add(next_url)
-                    success = True
-                    break  # Sucesso, não precisa de mais tentativas
+                    # Se for HTML, procura mais links
+                    elif 'text/html' in content_type:
+                        soup = BeautifulSoup(resp.text, 'html.parser')
+                        for link in soup.find_all('a', href=True):
+                            next_url = urljoin(url, link['href'])
+                            if self.is_valid_url(next_url) and next_url not in self.visited:
+                                self.to_visit.add(next_url)
+                        success = True
+                        break
+                    else:
+                        break
                 except Exception as e:
                     retries += 1
                     print(f"Erro ao acessar {url} (tentativa {retries}/{max_retries}): {e}")

@@ -4,6 +4,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from scrapers.ufpb_scraper import UFPBScraper
 from database.vector_store import VectorStore
 from sentence_transformers import SentenceTransformer
+from cardapio_manager import verificar_ou_atualizar_cardapio_automaticamente
+verificar_ou_atualizar_cardapio_automaticamente()
 import uvicorn
 from api.qa_endpoint import app
 

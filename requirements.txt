@@ -8,3 +8,5 @@ numpy==2.2.5
 python-multipart==0.0.9
 scikit-learn==1.6.1
 sentence-transformers==4.1.0
+PyPDF2
+tqdm
