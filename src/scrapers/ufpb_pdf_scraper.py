@@ -8,7 +8,7 @@ import numpy as np
 import tempfile
 import PyPDF2
 
-def find_pdf_links(base_url, max_pages=1000):
+def find_pdf_links(base_url, max_pages=1000000):
     """Percorre recursivamente o site e retorna todos os links diretos para PDFs."""
     to_visit = [base_url]
     visited = set()
@@ -18,7 +18,7 @@ def find_pdf_links(base_url, max_pages=1000):
         if url in visited:
             continue
         try:
-            resp = requests.get(url, timeout=10)
+            resp = requests.get(url, timeout=1)
             resp.raise_for_status()
             content_type = resp.headers.get('Content-Type', '')
             if 'text/html' in content_type:
@@ -54,17 +54,27 @@ def extract_pdf_text(pdf_url):
 
 def main():
     base_url = "https://www.ufpb.br/"
-    output_dir = "scraped_data"
+    output_dir = "data"
     os.makedirs(output_dir, exist_ok=True)
     docs_path = os.path.join(output_dir, "documents.json")
     embs_path = os.path.join(output_dir, "embeddings.npy")
-    model = SentenceTransformer('all-MiniLM-L6-v2')
+    model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
     all_docs = []
     all_embs = None
+    # Carrega PDFs já processados para evitar duplicidade
+    processed_urls = set()
+    if os.path.exists(docs_path):
+        with open(docs_path, 'r', encoding='utf-8') as f:
+            for doc in json.load(f):
+                processed_urls.add(doc.get('url'))
+    if os.path.exists(embs_path):
+        all_embs = np.load(embs_path)
     print("Buscando links de PDFs...")
     pdf_links = find_pdf_links(base_url)
     print(f"Encontrados {len(pdf_links)} PDFs.")
     for pdf_url in pdf_links:
+        if pdf_url in processed_urls:
+            continue  # Pula PDFs já processados
         print(f"Processando: {pdf_url}")
         text = extract_pdf_text(pdf_url)
         if text and len(text) > 100:
@@ -75,6 +85,11 @@ def main():
                 all_embs = np.vstack([all_embs, emb])
             else:
                 all_embs = emb
+    # Salva todos os docs (antigos + novos)
+    if os.path.exists(docs_path):
+        with open(docs_path, 'r', encoding='utf-8') as f:
+            old_docs = json.load(f)
+        all_docs = old_docs + all_docs
     with open(docs_path, 'w', encoding='utf-8') as f:
         json.dump(all_docs, f, ensure_ascii=False, indent=2)
     if all_embs is not None:

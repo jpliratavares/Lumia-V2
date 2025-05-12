@@ -1,11 +1,11 @@
 import sys
 import os
+import json
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from scrapers.ufpb_scraper import UFPBScraper
 from database.vector_store import VectorStore
 from sentence_transformers import SentenceTransformer
-from cardapio_manager import verificar_ou_atualizar_cardapio_automaticamente
-verificar_ou_atualizar_cardapio_automaticamente()
+# Removido: verificar_ou_atualizar_cardapio_automaticamente()
 import uvicorn
 from api.qa_endpoint import app
 
@@ -19,13 +19,28 @@ def check_venv():
         print("  Windows CMD: .\\venv\\Scripts\\activate.bat")
         sys.exit(1)
 
+def load_metadata():
+    """
+    Carrega o arquivo metadata.json se existir.
+    Retorna uma lista de dicionários com os metadados.
+    Se não existir, retorna lista vazia e avisa no terminal.
+    """
+    meta_path = os.path.join('data', 'metadata.json')
+    if not os.path.exists(meta_path):
+        print("metadata.json não encontrado, rode generate_metadata.py primeiro.")
+        return []
+    with open(meta_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
 def collect_and_index_data():
     vector_store = VectorStore()
     # Tenta carregar dados existentes primeiro
     try:
         print("Tentando carregar dados existentes...")
         vector_store.load("data")
-        print(f"Dados carregados com sucesso! {len(vector_store.documents)} documentos encontrados.")
+        # Compatível com arquitetura de agentes
+        num_docs = len(vector_store.index_agent.documents)
+        print(f"Dados carregados com sucesso! {num_docs} documentos encontrados.")
         return vector_store
     except Exception as e:
         print(f"Erro ao carregar dados existentes: {str(e)}")
