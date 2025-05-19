@@ -10,10 +10,13 @@ from sentence_transformers import SentenceTransformer
 import uvicorn
 from api.qa_endpoint import router as qa_router
 from api.qb_agent import router as qb_router  # ou src.agents.qb_agent dependendo do caminho
+from api.orchestrator import router as orchestrator_router  # ou src.agents.orchestrator dependendo do caminho  
 
 app = FastAPI()
 
+app.include_router(qa_router)
 app.include_router(qb_router)
+app.include_router(orchestrator_router)
 
 
 def check_venv():

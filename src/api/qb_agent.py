@@ -6,7 +6,8 @@ from groq import Groq
 from dotenv import load_dotenv
 import os
 
-router = APIRouter()
+router = APIRouter(prefix="/qb")
+
 load_dotenv()
 
 class Question(BaseModel):
@@ -21,7 +22,7 @@ class Answer(BaseModel):
 agent_manager = AgentManager()
 agent_manager.register_agent(
     name="qb",
-    data_dir="data/qb",
+    data_dir="data/",
     embedding_model='paraphrase-multilingual-MiniLM-L12-v2',
     default=True
 )
@@ -37,7 +38,10 @@ async def ask_qb(
         relevant_docs = ag.vector_store.search(query_embedding, k=8)
 
         sources = list(set(doc["url"].split('#')[0] for doc in relevant_docs))
-        context = "\n\n".join([f"Fonte: {doc['url']}\n{doc['content']}" for doc in relevant_docs])
+        context = "\n\n".join([
+    f"Fonte: {doc['url']}\n{doc['content'][:1000]}"  # 1000 caracteres ≈ 250 tokens por doc
+    for doc in relevant_docs
+])
         scores = [doc.get("score", 0.0) for doc in relevant_docs]
 
         if not relevant_docs:
@@ -72,3 +76,27 @@ async def list_documents_qb():
 @router.get("/health")
 async def health_check_qb():
     return {"status": "healthy"}
+
+async def ask_qb_internal(question: Question, threshold: float = 0.4) -> Answer:
+    ag = agent_manager.get_agent("qb")
+    query_embedding = ag.get_embedding(question.text)
+    relevant_docs = ag.vector_store.search(query_embedding, k=8)
+
+    if not relevant_docs:
+        return Answer(answer="Nenhum documento relevante encontrado.", sources=[], scores=[])
+
+    sources = list(set(doc["url"].split('#')[0] for doc in relevant_docs))
+    context = "\n\n".join([f"Fonte: {doc['url']}\n{doc['content']}" for doc in relevant_docs])
+    scores = [doc.get("score", 0.0) for doc in relevant_docs]
+
+    prompt = f"""Com base no contexto abaixo, responda a pergunta em português.\nSe não houver contexto suficiente, diga isso claramente.\n\nContexto:\n{context}\n\nPergunta: {question.text}\n\nResposta:"""
+    groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    response = groq_client.chat.completions.create(
+        messages=[{"role": "user", "content": prompt}],
+        model="llama3-8b-8192",
+        temperature=0.1,
+        max_tokens=500
+    )
+    answer = response.choices[0].message.content.strip()
+    return Answer(answer=answer, sources=sources, scores=scores)
+
