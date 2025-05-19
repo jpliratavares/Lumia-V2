@@ -3,11 +3,18 @@ import os
 import json
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from scrapers.ufpb_scraper import UFPBScraper
+from fastapi import FastAPI, HTTPException
 from database.vector_store import VectorStore
 from sentence_transformers import SentenceTransformer
 # Removido: verificar_ou_atualizar_cardapio_automaticamente()
 import uvicorn
-from api.qa_endpoint import app
+from api.qa_endpoint import router as qa_router
+from api.qb_agent import router as qb_router  # ou src.agents.qb_agent dependendo do caminho
+
+app = FastAPI()
+
+app.include_router(qb_router)
+
 
 def check_venv():
     """Verifica se o código está rodando em um ambiente virtual"""
@@ -17,7 +24,10 @@ def check_venv():
         print("Para ativar o ambiente virtual, use um dos comandos:")
         print("  Windows PowerShell: .\\venv\\Scripts\\Activate.ps1")
         print("  Windows CMD: .\\venv\\Scripts\\activate.bat")
-        sys.exit(1)
+        print("  Linux/Mac: source venv/bin/activate")
+        print("Recomenda-se usar o ambiente virtual para evitar conflitos de dependências.")
+        print("Continuando a execução do código pro gostoso do JP ser feliz finalmente sem a porcaria do erro do WSL...\n")
+
 
 def load_metadata():
     """
@@ -62,5 +72,10 @@ def main():
     # Run the FastAPI server
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
+# Adiciona isso no final do main.py
 if __name__ == "__main__":
     main()
+else:
+    # Permite que o uvicorn acesse a variável app diretamente
+    check_venv()
+    collect_and_index_data()
