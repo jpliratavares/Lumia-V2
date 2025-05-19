@@ -4,9 +4,11 @@ fastapi==0.110.0
 uvicorn==0.27.1
 python-dotenv==1.0.1
 groq==0.4.2
-numpy==2.2.5
+numpy==1.26.4
 python-multipart==0.0.9
 scikit-learn==1.6.1
 sentence-transformers==4.1.0
 PyPDF2
 tqdm
+faiss-cpu
+# torch, torchvision e torchaudio removidos para instalação manual via comando separado

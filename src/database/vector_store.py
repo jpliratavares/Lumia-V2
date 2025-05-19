@@ -3,6 +3,7 @@ import json
 import os
 from typing import List, Dict
 from sklearn.metrics.pairwise import cosine_similarity
+import faiss
 
 # --- Agente de Indexação ---
 class IndexAgent:
@@ -76,3 +77,42 @@ class VectorStoreOrchestrator:
 
 # Para compatibilidade retroativa
 VectorStore = VectorStoreOrchestrator
+
+class FaissIndexAgent:
+    def __init__(self, data_dir="data"):
+        self.data_dir = data_dir
+        self.documents = []
+        self.index = None
+        self._load()
+
+    def _load(self):
+        docs_path = os.path.join(self.data_dir, "documents.json")
+        faiss_path = os.path.join(self.data_dir, "faiss.index")
+        if os.path.exists(docs_path):
+            with open(docs_path, 'r', encoding='utf-8') as f:
+                self.documents = json.load(f)
+        if os.path.exists(faiss_path):
+            self.index = faiss.read_index(faiss_path)
+        else:
+            self.index = faiss.IndexFlatL2(384)
+
+    def search(self, query_embedding: np.ndarray, k=5):
+        if self.index is None or len(self.documents) == 0:
+            return []
+        D, I = self.index.search(query_embedding.reshape(1, -1), k)
+        results = []
+        for idx, dist in zip(I[0], D[0]):
+            if idx < 0 or idx >= len(self.documents):
+                continue
+            doc = self.documents[idx].copy()
+            doc['score'] = float(-dist)  # Negativo porque L2, para parecer score
+            results.append(doc)
+        return results
+
+# --- Faiss Vector Store Orchestrator ---
+class FaissVectorStore:
+    def __init__(self, data_dir="data"):
+        self.agent = FaissIndexAgent(data_dir)
+
+    def search(self, query_embedding: np.ndarray, k=5):
+        return self.agent.search(query_embedding, k)
