@@ -1,3 +1,7 @@
+
+
+## <b>OBSOLETO</b>
+
 ## Metadados de Documentos
 
 O projeto LumIA permite gerar e consumir metadados dos documentos indexados para facilitar buscas, exibições e integrações.
