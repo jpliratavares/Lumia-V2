@@ -1,6 +1,6 @@
 
 
-## <b>OBSOLETO</b>
+## <b>README OBSOLETO, SERÁ REESCRITO EM BREVE.</b>
 
 ## Metadados de Documentos
 
